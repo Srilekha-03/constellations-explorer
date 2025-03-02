@@ -1,15 +1,14 @@
-// components/ConstellationList.js
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
+import SearchBar from './SearchBar';
 
-const ConstellationList = () => {
+const ConstellationsList = () => {
   const [constellations, setConstellations] = useState([]);
   const [filteredConstellations, setFilteredConstellations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [seasonFilter, setSeasonFilter] = useState('');
+  const [seasonFilter, setSeasonFilter] = useState('all');
 
   useEffect(() => {
     const fetchConstellations = async () => {
@@ -19,96 +18,112 @@ const ConstellationList = () => {
         setFilteredConstellations(response.data);
         setLoading(false);
       } catch (err) {
-        setError('Failed to fetch constellations');
+        setError('Failed to load constellations');
         setLoading(false);
-        console.error(err);
       }
     };
 
     fetchConstellations();
   }, []);
 
-  useEffect(() => {
-    // Filter constellations based on search term and season filter
-    const filtered = constellations.filter(constellation => {
-      const matchesSearch = constellation.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           constellation.description.toLowerCase().includes(searchTerm.toLowerCase());
-      
-      const matchesSeason = seasonFilter === '' || constellation.visible_season.toLowerCase() === seasonFilter.toLowerCase();
-      
-      return matchesSearch && matchesSeason;
-    });
+  const handleSearch = (searchTerm) => {
+    if (searchTerm === '') {
+      // If search is cleared, just apply the current season filter
+      filterBySeason(seasonFilter);
+      return;
+    }
+
+    const term = searchTerm.toLowerCase();
+    const filtered = constellations.filter(
+      (constellation) =>
+        constellation.name.toLowerCase().includes(term) ||
+        constellation.latin_name.toLowerCase().includes(term) ||
+        constellation.description.toLowerCase().includes(term) ||
+        constellation.main_stars.some(star => star.toLowerCase().includes(term))
+    );
+
+    // Apply season filter to search results if needed
+    if (seasonFilter !== 'all') {
+      setFilteredConstellations(
+        filtered.filter(constellation => 
+          constellation.visible_season.toLowerCase() === seasonFilter.toLowerCase()
+        )
+      );
+    } else {
+      setFilteredConstellations(filtered);
+    }
+  };
+
+  const filterBySeason = (season) => {
+    setSeasonFilter(season);
     
-    setFilteredConstellations(filtered);
-  }, [searchTerm, seasonFilter, constellations]);
-
-  const handleSearchChange = (e) => {
-    setSearchTerm(e.target.value);
+    if (season === 'all') {
+      setFilteredConstellations(constellations);
+    } else {
+      setFilteredConstellations(
+        constellations.filter(
+          (constellation) => constellation.visible_season.toLowerCase() === season.toLowerCase()
+        )
+      );
+    }
   };
 
-  const handleSeasonChange = (e) => {
-    setSeasonFilter(e.target.value);
-  };
+  if (loading) return <div className="container loading">Loading constellations...</div>;
 
-  const handleImageError = (e) => {
-    e.target.onerror = null;
-    e.target.src = "https://placehold.co/600x400/1a237e/FFFFFF?text=Constellation";
-  };
-
-  if (loading) return <div className="loading">Loading constellations...</div>;
-  if (error) return <div className="error">{error}</div>;
+  if (error) return <div className="container error">{error}</div>;
 
   return (
-    <div className="constellation-list">
-      <h1>Constellations</h1>
-      
-      <div className="filters">
-        <div className="search-box">
-          <input
-            type="text"
-            placeholder="Search constellations..."
-            value={searchTerm}
-            onChange={handleSearchChange}
-            className="search-input"
-          />
+    <div className="container">
+      <div className="constellation-list">
+        <h1>Explore Constellations</h1>
+        
+        <div className="filters">
+          <div className="search-box">
+            <SearchBar onSearch={handleSearch} />
+          </div>
+          
+          <div className="season-filter">
+            <span>Filter by Season: </span>
+            <select 
+              value={seasonFilter} 
+              onChange={(e) => filterBySeason(e.target.value)}
+              className="season-select"
+            >
+              <option value="all">All Seasons</option>
+              <option value="spring">Spring</option>
+              <option value="summer">Summer</option>
+              <option value="fall">Fall</option>
+              <option value="winter">Winter</option>
+            </select>
+          </div>
         </div>
         
-        <div className="season-filter">
-          <select value={seasonFilter} onChange={handleSeasonChange} className="season-select">
-            <option value="">All Seasons</option>
-            <option value="Winter">Winter</option>
-            <option value="Spring">Spring</option>
-            <option value="Summer">Summer</option>
-            <option value="Fall">Fall</option>
-          </select>
-        </div>
-      </div>
-      
-      {filteredConstellations.length === 0 ? (
-        <div className="no-results">No constellations found matching your criteria</div>
-      ) : (
-        <div className="card-container">
-          {filteredConstellations.map(constellation => (
-            <div key={constellation.id} className="card">
-              <img 
-                src={constellation.image_url} 
-                alt={constellation.name} 
-                className="card-image"
-                onError={handleImageError}
-              />
-              <div className="card-content">
-                <h2>{constellation.name}</h2>
-                <p>Season: {constellation.visible_season}</p>
-                <Link to={`/constellations/${constellation.id}`} className="btn btn-secondary">
-                  View Details
-                </Link>
+        {filteredConstellations.length === 0 ? (
+          <div className="no-results">No constellations match your search criteria</div>
+        ) : (
+          <div className="card-container">
+            {filteredConstellations.map((constellation) => (
+              <div key={constellation.id} className="card">
+                <img 
+                  src={constellation.image_url} 
+                  alt={constellation.name} 
+                  className="card-image" 
+                />
+                <div className="card-content">
+                  <h2>{constellation.name}</h2>
+                  <p className="season-tag">Best in: {constellation.visible_season}</p>
+                  <p className="stars-count">{constellation.stars_count} main stars</p>
+                  <Link to={`/constellations/${constellation.id}`} className="btn btn-primary">
+                    View Details
+                  </Link>
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
-      )}
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 };
 
-export default ConstellationList;
+export default ConstellationsList;
